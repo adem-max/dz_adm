@@ -1,0 +1,206 @@
+{
+ "actions": [],
+ "autoname": "field:site_name",
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "customer",
+  "site_name",
+  "column_break_main",
+  "status",
+  "start_date",
+  "offer_section",
+  "features",
+  "site_section",
+  "company_name",
+  "company_abbr",
+  "column_break_site",
+  "courier",
+  "admin_password",
+  "state_section",
+  "subscription",
+  "site_created",
+  "applied_features",
+  "applied_on",
+  "column_break_state",
+  "last_action",
+  "apply_log",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Client (facturation)",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "description": "Nom du site sur le serveur, par exemple client2.localhost ou erp.client.com",
+   "fieldname": "site_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Site",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Actif",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "État",
+   "options": "Actif\nSuspendu\nRésilié",
+   "read_only": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Début de l'abonnement"
+  },
+  {
+   "collapsible": 0,
+   "fieldname": "offer_section",
+   "fieldtype": "Section Break",
+   "label": "Offre"
+  },
+  {
+   "description": "La base est toujours incluse. Après un changement : « Appliquer au site ».",
+   "fieldname": "features",
+   "fieldtype": "Table MultiSelect",
+   "label": "Fonctions optionnelles",
+   "options": "DZ Client Feature"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "site_section",
+   "fieldtype": "Section Break",
+   "label": "Création du site"
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Société du client"
+  },
+  {
+   "fieldname": "company_abbr",
+   "fieldtype": "Data",
+   "label": "Abréviation",
+   "length": 5
+  },
+  {
+   "fieldname": "column_break_site",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Par exemple Yalidine (connecteur Manuel au départ)",
+   "fieldname": "courier",
+   "fieldtype": "Data",
+   "label": "Premier transporteur"
+  },
+  {
+   "description": "Généré à la création du site.",
+   "fieldname": "admin_password",
+   "fieldtype": "Password",
+   "label": "Mot de passe Administrator du site",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "state_section",
+   "fieldtype": "Section Break",
+   "label": "Suivi"
+  },
+  {
+   "fieldname": "subscription",
+   "fieldtype": "Link",
+   "label": "Abonnement",
+   "options": "Subscription",
+   "read_only": 1
+  },
+  {
+   "fieldname": "site_created",
+   "fieldtype": "Check",
+   "label": "Site créé par le hub",
+   "read_only": 1
+  },
+  {
+   "fieldname": "applied_features",
+   "fieldtype": "Small Text",
+   "label": "Fonctions appliquées au site",
+   "read_only": 1
+  },
+  {
+   "fieldname": "applied_on",
+   "fieldtype": "Datetime",
+   "label": "Appliqué le",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_state",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_action",
+   "fieldtype": "Data",
+   "label": "Dernière action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "apply_log",
+   "fieldtype": "Code",
+   "label": "Journal de la dernière action",
+   "read_only": 1
+  },
+  {
+   "collapsible": 0,
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "DZ COD Hub",
+ "name": "DZ Client",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "customer",
+ "track_changes": 1
+}

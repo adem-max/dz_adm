@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "days_until_due",
+  "grace_days",
+  "column_break_main",
+  "mariadb_root_password"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Société qui facture",
+   "options": "Company"
+  },
+  {
+   "default": "10",
+   "description": "Une facture non payée après ce délai passe « En retard ».",
+   "fieldname": "days_until_due",
+   "fieldtype": "Int",
+   "label": "Délai de paiement (jours)"
+  },
+  {
+   "default": "0",
+   "fieldname": "grace_days",
+   "fieldtype": "Int",
+   "label": "Tolérance avant la liste des retards (jours)"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Utilisé seulement par « Créer le site ».",
+   "fieldname": "mariadb_root_password",
+   "fieldtype": "Password",
+   "label": "Mot de passe root MariaDB"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "DZ COD Hub",
+ "name": "DZ Hub Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
