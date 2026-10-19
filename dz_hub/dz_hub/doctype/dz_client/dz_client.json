@@ -11,10 +11,13 @@
   "status",
   "start_date",
   "offer_section",
+  "online_sales",
   "features",
   "site_section",
   "company_name",
   "company_abbr",
+  "sector",
+  "tax_regime",
   "column_break_site",
   "courier",
   "admin_password",
@@ -75,10 +78,16 @@
    "label": "Offre"
   },
   {
-   "description": "La base est toujours incluse. Après un changement : « Appliquer au site ».",
+   "fieldname": "online_sales",
+   "fieldtype": "Check",
+   "label": "Vente en ligne (dz_cod)",
+   "description": "Le pack Atelier (dz_core) est toujours inclus. Cochez pour un vendeur en ligne : commandes COD, transporteurs, versements."
+  },
+  {
+   "description": "Les options des applications du client (celles de dz_cod demandent la vente en ligne).",
    "fieldname": "features",
    "fieldtype": "Table MultiSelect",
-   "label": "Fonctions optionnelles",
+   "label": "Options",
    "options": "DZ Client Feature"
   },
   {
@@ -99,6 +108,20 @@
    "length": 5
   },
   {
+   "fieldname": "sector",
+   "fieldtype": "Select",
+   "label": "Secteur",
+   "options": "Confection\nAlimentaire et cosmétique",
+   "default": "Confection"
+  },
+  {
+   "fieldname": "tax_regime",
+   "fieldtype": "Select",
+   "label": "Régime fiscal",
+   "options": "IFU\nRégime réel",
+   "default": "IFU"
+  },
+  {
    "fieldname": "column_break_site",
    "fieldtype": "Column Break"
   },
@@ -106,7 +129,8 @@
    "description": "Par exemple Yalidine (connecteur Manuel au départ)",
    "fieldname": "courier",
    "fieldtype": "Data",
-   "label": "Premier transporteur"
+   "label": "Premier transporteur",
+   "depends_on": "online_sales"
   },
   {
    "description": "Généré à la création du site.",
@@ -176,9 +200,9 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-19 18:00:00.000000",
  "modified_by": "Administrator",
- "module": "DZ COD Hub",
+ "module": "DZ Hub",
  "name": "DZ Client",
  "naming_rule": "By fieldname",
  "owner": "Administrator",

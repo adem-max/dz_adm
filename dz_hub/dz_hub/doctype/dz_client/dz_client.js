@@ -1,5 +1,5 @@
-// DZ Client: buttons that act on the client's site (dz_cod_hub/remote.py)
-// and on their billing (dz_cod_hub/billing.py).
+// DZ Client: buttons that act on the client's site (dz_hub/remote.py)
+// and on their billing (dz_hub/billing.py).
 
 frappe.ui.form.on("DZ Client", {
 	setup(frm) {
@@ -16,6 +16,12 @@ frappe.ui.form.on("DZ Client", {
 		});
 	},
 
+	onload(frm) {
+		// Packs are fields of the client (Atelier always, Vente en ligne ticked):
+		// the table only offers options
+		frm.set_query("features", () => ({ filters: { kind: "Option" } }));
+	},
+
 	refresh(frm) {
 		if (frm.is_new()) return;
 		show_indicator(frm);
@@ -23,7 +29,7 @@ frappe.ui.form.on("DZ Client", {
 		const run = (action, confirm_text) => {
 			const go = () =>
 				frappe
-					.xcall("dz_cod_hub.remote.start", { client: frm.doc.name, action })
+					.xcall("dz_hub.remote.start", { client: frm.doc.name, action })
 					.then((message) => frappe.show_alert({ message, indicator: "blue" }, 8));
 			confirm_text ? frappe.confirm(confirm_text, go) : go();
 		};
@@ -34,8 +40,9 @@ frappe.ui.form.on("DZ Client", {
 				() =>
 					run(
 						"create_site",
-						__("Créer le site {0} avec ERPNext et dz_cod ? Cela prend quelques minutes.", [
+						__("Créer le site {0} avec ERPNext et {1} ? Cela prend quelques minutes.", [
 							frm.doc.site_name,
+							frm.doc.online_sales ? "dz_core + dz_cod" : "dz_core",
 						])
 					),
 				__("Site")
@@ -66,7 +73,7 @@ frappe.ui.form.on("DZ Client", {
 	},
 });
 
-// Orange "Non appliqué" when the site does not have what the client pays for
+// Orange "Non appliqué" when the site does not have the options the client pays for
 function show_indicator(frm) {
 	const chosen = (frm.doc.features || []).map((row) => row.feature).sort().join(", ") || "-";
 	const applied = frm.doc.applied_features || "";

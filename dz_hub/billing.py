@@ -1,7 +1,7 @@
 """Monthly billing of a client with ERPNext's Subscription.
 
-One Subscription per client: the base plan plus one plan per optional
-feature. ERPNext's daily job turns it into one Sales Invoice a month (one
+One Subscription per client: the Atelier pack (always), the Vente en ligne
+pack for online sellers, plus one plan per option. ERPNext's daily job turns it into one Sales Invoice a month (one
 line per plan); an unpaid invoice past its due date becomes "Overdue" and the
 client shows in the report "Clients en retard".
 """
@@ -10,12 +10,13 @@ import frappe
 from frappe import _
 from frappe.utils import getdate, today
 
-from dz_cod_hub.setup import BASE
+from dz_hub.setup import BASE, ONLINE
 
 
 def plans_for(client):
-	"""Subscription Plans of the client: base + chosen features."""
-	codes = [BASE] + [row.feature for row in client.features if row.feature != BASE]
+	"""Subscription Plans of the client: packs + chosen options."""
+	codes = [BASE] + ([ONLINE] if client.online_sales else [])
+	codes += [row.feature for row in client.features if row.feature not in (BASE, ONLINE)]
 	plans = []
 	for code in codes:
 		plan = frappe.db.get_value("DZ Feature", code, "subscription_plan")
