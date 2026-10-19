@@ -18,8 +18,20 @@ def execute(filters=None):
 
 def get_columns():
 	return [
-		{"fieldname": "client", "label": _("Client"), "fieldtype": "Link", "options": "DZ Client", "width": 200},
-		{"fieldname": "customer", "label": _("Facturé à"), "fieldtype": "Link", "options": "Customer", "width": 180},
+		{
+			"fieldname": "client",
+			"label": _("Client"),
+			"fieldtype": "Link",
+			"options": "DZ Client",
+			"width": 200,
+		},
+		{
+			"fieldname": "customer",
+			"label": _("Facturé à"),
+			"fieldtype": "Link",
+			"options": "Customer",
+			"width": 180,
+		},
 		{"fieldname": "status", "label": _("État"), "fieldtype": "Data", "width": 90},
 		{"fieldname": "invoices", "label": _("Factures en retard"), "fieldtype": "Int", "width": 130},
 		{"fieldname": "outstanding", "label": _("Montant dû"), "fieldtype": "Currency", "width": 130},

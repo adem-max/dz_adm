@@ -1,9 +1,9 @@
 [project]
-name = "dz_cod_hub"
+name = "dz_hub"
 authors = [
     { name = "Adem", email = "adembenlecheb1@gmail.com"}
 ]
-description = "Client management and billing for dz-cod (vendor only)"
+description = "Client management and billing for the Daftar apps (vendor only)"
 requires-python = ">=3.14"
 readme = "README.md"
 dynamic = ["version"]

@@ -4,3 +4,5 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+dz_hub.patches.rename_billing
+dz_hub.patches.clients_were_online_sellers
