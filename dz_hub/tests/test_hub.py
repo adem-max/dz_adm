@@ -6,6 +6,7 @@ Run on a hub TEST site (never the real hub):
     bench --site hub-test.localhost run-tests --app dz_hub
 """
 
+import ast
 import json
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -196,26 +197,38 @@ class TestRemote(IntegrationTestCase):
 		self.assertIn("site down", client.apply_log)
 		self.assertIn("échec", client.last_action)
 
-	def create(self, client):
+	def create(self, client, sites=(), mark=None, apps=("frappe", "erpnext")):
+		"""Run "Créer le site" with bench mocked. `sites`: the sites already on
+		the bench; `mark`: the client name found in an existing site's config."""
 		answer = json.dumps({"site": client.site_name, "configured": True, "features": {}})
 		frappe.db.set_single_value("DZ Hub Settings", "mariadb_root_password", "secret")
 		with (
 			patch("frappe.db.commit"),
-			patch.object(remote, "check_site_name"),
+			patch.object(remote, "get_sites", return_value=list(sites)),
+			patch.object(remote, "site_mark", return_value=mark),
+			patch.object(remote, "installed_apps", return_value=list(apps)),
 			patch.object(remote, "run_bench", return_value=answer) as run,
 		):
 			remote.run_action(client.name, "create_site")
 		return [call.args[1] for call in run.call_args_list]
+
+	def kwargs_of(self, args):
+		"""What `bench execute --kwargs` gets. Bench reads it with Python's eval();
+		literal_eval refuses the same things (JSON's null, true, false)."""
+		return ast.literal_eval(args[-1])
 
 	def test_create_site_for_an_online_seller(self):
 		client = make_client(["courier_api"], site="client-new.localhost")
 		client.db_set({"company_name": "Client Nouveau", "company_abbr": "CN", "courier": "Yalidine"})
 		calls = self.create(client)
 		steps = [args[0] for args in calls]
-		self.assertEqual(steps, ["new-site", "install-app", "execute", "dz-features", "enable-scheduler"])
-		self.assertEqual(calls[1], ["install-app", "dz_cod"])  # dz_cod installs dz_core first
-		self.assertEqual(calls[2][1], "dz_cod.setup.new_client.prepare")
-		kwargs = json.loads(calls[2][-1])
+		self.assertEqual(
+			steps, ["new-site", "set-config", "install-app", "execute", "dz-features", "enable-scheduler"]
+		)
+		self.assertEqual(calls[1], ["set-config", remote.SITE_MARK, client.name])
+		self.assertEqual(calls[2], ["install-app", "dz_cod"])  # dz_cod installs dz_core first
+		self.assertEqual(calls[3][1], "dz_cod.setup.new_client.prepare")
+		kwargs = self.kwargs_of(calls[3])
 		self.assertEqual(kwargs["features"], ["courier_api"])
 		self.assertEqual(
 			(kwargs["company"], kwargs["sector"], kwargs["tax_regime"]),
@@ -223,7 +236,41 @@ class TestRemote(IntegrationTestCase):
 		)
 		client.reload()
 		self.assertTrue(client.site_created)
-		self.assertTrue(client.get_password("admin_password"))
+		# the site's Administrator password is stored encrypted, never in clear in the table
+		password = client.get_password("admin_password")
+		self.assertEqual(len(password), 16)
+		self.assertEqual(frappe.db.get_value("DZ Client", client.name, "admin_password"), "*" * 16)
+		self.assertIn(password, calls[0])
+
+	def test_prepare_arguments_are_python_not_json(self):
+		# A client without a courier, a company name with quotes and accents
+		client = make_client([], site="client-quotes.localhost")
+		client.db_set({"company_name": 'L\'Atelier "Été"', "company_abbr": "AE", "courier": None})
+		kwargs = self.kwargs_of(remote.prepare(client))
+		self.assertIsNone(kwargs["courier"])
+		self.assertEqual(kwargs["company"], 'L\'Atelier "Été"')
+		self.assertEqual(kwargs["features"], [])
+
+	def test_create_site_carries_on_after_a_failed_step(self):
+		# new-site ran earlier, then a step failed: the site exists and is marked as this client's
+		client = make_client([], site="client-resume.localhost", online=0)
+		client.db_set({"company_name": "Reprise", "company_abbr": "RP"})
+		calls = self.create(client, sites=[client.site_name], mark=client.name, apps=["frappe", "erpnext"])
+		self.assertEqual(
+			[args[0] for args in calls], ["install-app", "execute", "dz-features", "enable-scheduler"]
+		)
+		client.reload()
+		self.assertTrue(client.site_created)
+		self.assertNotIn("échec", client.last_action)
+
+	def test_create_site_refuses_a_site_made_for_someone_else(self):
+		client = make_client([], site="client-taken.localhost", online=0)
+		client.db_set({"company_name": "Pris", "company_abbr": "PR"})
+		calls = self.create(client, sites=[client.site_name], mark="another-client.localhost")
+		self.assertEqual(calls, [])
+		client.reload()
+		self.assertFalse(client.site_created)
+		self.assertIn("échec", client.last_action)
 
 	def test_create_site_for_a_producer_installs_dz_core_only(self):
 		client = make_client([], site="client-miel.localhost", online=0)
@@ -236,9 +283,9 @@ class TestRemote(IntegrationTestCase):
 			}
 		)
 		calls = self.create(client)
-		self.assertEqual(calls[1], ["install-app", "dz_core"])
-		self.assertEqual(calls[2][1], "dz_core.setup.new_client.prepare")
-		kwargs = json.loads(calls[2][-1])
+		self.assertEqual(calls[2], ["install-app", "dz_core"])
+		self.assertEqual(calls[3][1], "dz_core.setup.new_client.prepare")
+		kwargs = self.kwargs_of(calls[3])
 		self.assertEqual(
 			(kwargs["sector"], kwargs["tax_regime"]), ("Alimentaire et cosmétique", "Régime réel")
 		)
@@ -259,4 +306,5 @@ class TestRemote(IntegrationTestCase):
 		calls = [call.args[1] for call in run.call_args_list]
 		self.assertEqual(calls[0], ["install-app", "dz_cod"])
 		self.assertEqual(calls[1][1], "dz_cod.setup.new_client.prepare")
+		self.assertIsNone(self.kwargs_of(calls[1])["courier"])  # was JSON null: bench refused it
 		self.assertEqual(calls[2][0], "dz-features")

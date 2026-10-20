@@ -16,7 +16,9 @@ hub talks to dz_core first and to dz_cod only for what dz_cod adds:
   dz_cod which installs dz_core first), then the right prepare():
   dz_core.setup.new_client.prepare (sector, tax regime) or, for an online
   seller, dz_cod.setup.new_client.prepare (which runs dz_core's first and
-  adds the COD part), then the options with dz_core's `dz-features`
+  adds the COD part), then the options with dz_core's `dz-features`. The site
+  is marked with the client's name (site_config key `dz_hub_client`): when a
+  step after `new-site` fails, clicking again carries on with what is missing
 - apply_features: adds dz_cod (and its prepare) when the client took the
   Vente en ligne pack since, then `dz-features --set <options>`. Dropping the
   pack never uninstalls dz_cod (that would delete its orders): its options
@@ -25,6 +27,7 @@ hub talks to dz_core first and to dz_cod only for what dz_cod adds:
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,6 +40,9 @@ from dz_hub.setup import BASE, CORE_APP, ONLINE, ONLINE_APP
 
 SITE_NAME = re.compile(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$")
 TIMEOUT = {"create_site": 1800, "apply_features": 1800, "suspend": 120, "reactivate": 120}
+# site_config key of a site made by the hub: the DZ Client it was made for
+SITE_MARK = "dz_hub_client"
+SAVEPOINT = "dz_hub_action"
 
 
 class BenchError(Exception):
@@ -83,6 +89,12 @@ def installed_apps(site):
 	return json.loads(output.strip().splitlines()[-1])
 
 
+def python_literal(value):
+	"""`bench execute --kwargs` reads its argument with Python's eval(), not as
+	JSON: JSON's null (a client without a courier) is not Python and failed."""
+	return repr(value)
+
+
 def prepare(client):
 	"""bench execute arguments for the client's prepare(): dz_core's, or dz_cod's on top."""
 	kwargs = {
@@ -93,8 +105,8 @@ def prepare(client):
 	}
 	if client.online_sales:
 		kwargs.update({"courier": client.courier or None, "features": features_of(client)})
-		return ["execute", "dz_cod.setup.new_client.prepare", "--kwargs", json.dumps(kwargs)]
-	return ["execute", "dz_core.setup.new_client.prepare", "--kwargs", json.dumps(kwargs)]
+		return ["execute", "dz_cod.setup.new_client.prepare", "--kwargs", python_literal(kwargs)]
+	return ["execute", "dz_core.setup.new_client.prepare", "--kwargs", python_literal(kwargs)]
 
 
 def set_features(client):
@@ -107,18 +119,39 @@ def set_features(client):
 # ------------------------------------------------------------------ the actions
 
 
-def do_create_site(client):
-	check_site_name(client.site_name, must_exist=False)
+def site_mark(site):
+	"""The DZ Client the hub made this site for (site_config key SITE_MARK), or None."""
+	path = os.path.join(get_bench_path(), "sites", site, "site_config.json")
+	try:
+		with open(path) as f:
+			return json.load(f).get(SITE_MARK)
+	except (OSError, ValueError):
+		return None
+
+
+def keep_admin_password(client, password):
+	"""Store the site's Administrator password, encrypted (db_set alone would
+	write it in clear in the table), and keep it even if a later step fails:
+	run_action rolls back to its savepoint, but the site has this password."""
+	from frappe.utils.password import set_encrypted_password
+
+	set_encrypted_password(client.doctype, client.name, password, "admin_password")
+	client.db_set("admin_password", "*" * len(password), update_modified=False)
+	frappe.db.commit()
+	frappe.db.savepoint(SAVEPOINT)
+
+
+def new_site(client):
+	"""bench new-site with ERPNext, then mark the site as this client's."""
 	settings = frappe.get_single("DZ Hub Settings")
 	root_password = settings.get_password("mariadb_root_password", raise_exception=False)
 	if not root_password:
 		frappe.throw(_("Renseignez le mot de passe root MariaDB dans DZ Hub Settings."))
-	if not (client.company_name and client.company_abbr):
-		frappe.throw(_("Renseignez la société du client et son abréviation."))
 
 	admin_password = client.get_password("admin_password", raise_exception=False) or frappe.generate_hash(
 		length=16
 	)
+	keep_admin_password(client, admin_password)
 	log = run_bench(
 		client.site_name,
 		[
@@ -133,14 +166,40 @@ def do_create_site(client):
 		],
 		timeout=TIMEOUT["create_site"],
 	)
+	# From here every step can run again: a failed creation is resumed, not refused
+	log += run_bench(client.site_name, ["set-config", SITE_MARK, client.name])
+	return log
+
+
+def do_create_site(client):
+	site = client.site_name
+	check_site_format(site)
+	if not (client.company_name and client.company_abbr):
+		frappe.throw(_("Renseignez la société du client et son abréviation."))
+
+	if site not in get_sites():
+		log = new_site(client)
+	elif site_mark(site) == client.name:
+		# An earlier "Créer le site" stopped after new-site: carry on
+		log = _("Le site {0} existe déjà : la création reprend où elle s'était arrêtée.").format(site) + "\n"
+	else:
+		frappe.throw(
+			_(
+				"Le site {0} existe déjà et n'a pas été créé pour ce client. Pour un site fait à la main, "
+				"utilisez « Appliquer au site »."
+			).format(site)
+		)
+
 	# dz_cod declares required_apps = ["erpnext", "dz_core"]: it installs dz_core first
 	app = ONLINE_APP if client.online_sales else CORE_APP
-	log += run_bench(client.site_name, ["install-app", app], timeout=TIMEOUT["create_site"])
-	log += run_bench(client.site_name, prepare(client), timeout=TIMEOUT["create_site"])
+	if app not in installed_apps(site):
+		log += run_bench(site, ["install-app", app], timeout=TIMEOUT["create_site"])
+	# prepare(), dz-features and enable-scheduler are safe to run twice
+	log += run_bench(site, prepare(client), timeout=TIMEOUT["create_site"])
 	output, applied = set_features(client)
 	log += output
-	log += run_bench(client.site_name, ["enable-scheduler"])
-	client.db_set({"admin_password": admin_password, "site_created": 1})
+	log += run_bench(site, ["enable-scheduler"])
+	client.db_set("site_created", 1)
 	return log, applied
 
 
@@ -206,7 +265,7 @@ def run_action(client, action, user=None):
 	doc = frappe.get_doc("DZ Client", client)
 	function, title = ACTIONS[action]
 	values = {"last_action": f"{title} - {now_datetime():%Y-%m-%d %H:%M}"}
-	frappe.db.savepoint("dz_hub_action")
+	frappe.db.savepoint(SAVEPOINT)
 	try:
 		log, applied = function(doc)
 		values["apply_log"] = log[-8000:]
@@ -216,7 +275,7 @@ def run_action(client, action, user=None):
 			values["status"] = NEW_STATUS[action]
 		failed = False
 	except Exception as error:
-		frappe.db.rollback(save_point="dz_hub_action")  # undo only this action's changes
+		frappe.db.rollback(save_point=SAVEPOINT)  # undo only this action's changes
 		values["apply_log"] = str(error)[-8000:]
 		values["last_action"] += " (échec)"
 		failed = True
