@@ -30,3 +30,6 @@ add_to_apps_screen = [
 # Features, billing items and monthly plans (dz_hub/setup.py)
 after_install = "dz_hub.setup.after_install"
 after_migrate = "dz_hub.setup.after_migrate"
+
+# A fresh test site gets a company and the offer before the tests (dz_hub/tests/utils.py)
+before_tests = "dz_hub.tests.utils.before_tests"

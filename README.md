@@ -122,7 +122,13 @@ On a separate hub test site, never your real hub (tests write and roll back data
 
 ```bash
 bench --site hub-test.localhost set-config allow_tests 1
-bench --site hub-test.localhost run-tests --app dz_hub     # 19 tests
+bench --site hub-test.localhost run-tests --app dz_hub     # 22 tests
 ```
 
 The `bench` calls are mocked in the tests: no site is created or changed.
+
+A fresh test site gets a company and the offer before the tests
+(`dz_hub/tests/utils.py`, hook `before_tests`). Every push runs pre-commit and
+the tests on a fresh site on GitHub (`.github/workflows/ci.yml`), with
+dafter-core and dafter-cod taken at the branch of the same name when there is
+one, else main.
