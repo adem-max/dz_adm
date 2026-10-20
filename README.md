@@ -48,7 +48,10 @@ can be sold (`dz_core.features.bench_catalog`) and to set sites up.
     client's sector and tax regime (or dz_cod's, which runs dz_core's and
     adds orders, warehouses, the first courier), then the options with
     `dz-features`. Local bench only: DNS, nginx and SSL stay manual
-    (dafter-core docs/DEPLOY.md §7).
+    (dafter-core docs/DEPLOY.md §7). The new site is marked with the
+    client's name (`dz_hub_client` in its site_config): if a step after
+    `new-site` fails, fix the cause and click again, it carries on. The site's
+    Administrator password is kept on the client, encrypted.
   - *Appliquer au site*: `bench --site <site> dz-features --set …`. When the
     client took *Vente en ligne* after their site was made, it first installs
     dz_cod and runs its setup. Untaking it never uninstalls dz_cod (that
@@ -119,7 +122,7 @@ On a separate hub test site, never your real hub (tests write and roll back data
 
 ```bash
 bench --site hub-test.localhost set-config allow_tests 1
-bench --site hub-test.localhost run-tests --app dz_hub     # 16 tests
+bench --site hub-test.localhost run-tests --app dz_hub     # 19 tests
 ```
 
 The `bench` calls are mocked in the tests: no site is created or changed.
