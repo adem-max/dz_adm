@@ -1,9 +1,9 @@
-__version__ = "0.0.1"
+__version__ = "0.2.0"
 
 # The oldest dz_core this hub works with: it reads dz_core's feature catalogue,
 # sectors and tax regimes, and runs its setup on client sites. Raise it in the
 # commit that starts using something new from dz_core.
-DZ_CORE_MIN = "0.1.0"
+DZ_CORE_MIN = "0.2.0"
 
 
 def version_tuple(version):
