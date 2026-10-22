@@ -7,6 +7,9 @@ invoices, and suspension when they don't pay.
 (Called "DZ COD Hub", app `dz_cod_hub`, until 19 October 2026, when it only
 knew online sellers. Repo: adem-max/dz_adm, private.)
 
+Brand (22 October 2026): the company is **Sijil**, the ERP it sells is
+**Daftar** ("Daftar by Sijil"); see dafter-core DECISIONS.md. Nothing renamed yet.
+
 **Private.** Install it only on your hub site, never on a client site.
 
 ## How it fits
