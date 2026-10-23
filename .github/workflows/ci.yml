@@ -1,7 +1,7 @@
 # Lint and tests on every push. Based on the workflow `bench new-app` writes
 # (Frappe 16, frappe/utils/boilerplate.py), with Frappe and ERPNext on version-16.
 # The hub reads dz_core and dz_cod from the bench without installing them:
-# both are taken at the branch of the same name when it exists, else at main.
+# both are taken at the branch (or tag) of the same name when it exists, else at main.
 name: CI
 
 on:
@@ -73,9 +73,11 @@ jobs:
 
       - name: Bench with Frappe, ERPNext 16, dafter-core and dafter-cod
         run: |
+          # A branch, or a release tag: siblings at the same branch or tag (v0.4.0 needs
+          # dz_core v0.4.0, which main may not have yet), else at main
           BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           same_or_main() {
-            if git ls-remote --exit-code --heads "https://github.com/adem-max/$1" "$BRANCH" > /dev/null; then echo "$BRANCH"; else echo main; fi
+            if git ls-remote --exit-code --heads --tags "https://github.com/adem-max/$1" "$BRANCH" > /dev/null; then echo "$BRANCH"; else echo main; fi
           }
           CORE=$(same_or_main dafter-core)
           COD=$(same_or_main dafter-cod)
