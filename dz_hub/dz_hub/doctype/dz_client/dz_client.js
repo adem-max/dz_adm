@@ -7,7 +7,9 @@ frappe.ui.form.on("DZ Client", {
 			if (data.client !== frm.doc.name) return;
 			frappe.show_alert(
 				{
-					message: `${data.title} : ${data.failed ? __("échec, voir le journal") : "OK"}`,
+					message: `${data.title} : ${
+						data.failed ? __("échec, voir le journal") : "OK"
+					}`,
 					indicator: data.failed ? "red" : "green",
 				},
 				10
@@ -40,10 +42,13 @@ frappe.ui.form.on("DZ Client", {
 				() =>
 					run(
 						"create_site",
-						__("Créer le site {0} avec ERPNext et {1} ? Cela prend quelques minutes.", [
-							frm.doc.site_name,
-							frm.doc.online_sales ? "dz_core + dz_cod" : "dz_core",
-						])
+						__(
+							"Créer le site {0} avec ERPNext et {1} ? Cela prend quelques minutes.",
+							[
+								frm.doc.site_name,
+								frm.doc.online_sales ? "dz_core + dz_cod" : "dz_core",
+							]
+						)
 					),
 				__("Site")
 			);
@@ -57,9 +62,10 @@ frappe.ui.form.on("DZ Client", {
 				() =>
 					run(
 						"suspend",
-						__("Suspendre {0} ? Le site affichera une page de maintenance jusqu'à la réactivation.", [
-							frm.doc.site_name,
-						])
+						__(
+							"Suspendre {0} ? Le site affichera une page de maintenance jusqu'à la réactivation.",
+							[frm.doc.site_name]
+						)
 					),
 				__("Site")
 			);
@@ -75,11 +81,18 @@ frappe.ui.form.on("DZ Client", {
 
 // Orange "Non appliqué" when the site does not have the options the client pays for
 function show_indicator(frm) {
-	const chosen = (frm.doc.features || []).map((row) => row.feature).sort().join(", ") || "-";
+	const chosen =
+		(frm.doc.features || [])
+			.map((row) => row.feature)
+			.sort()
+			.join(", ") || "-";
 	const applied = frm.doc.applied_features || "";
 	if (applied && applied !== chosen) {
 		frm.dashboard.set_headline_alert(
-			__("Fonctions non appliquées au site : choisies {0}, sur le site {1}.", [chosen, applied]),
+			__("Fonctions non appliquées au site : choisies {0}, sur le site {1}.", [
+				chosen,
+				applied,
+			]),
 			"orange"
 		);
 	} else if (!applied) {

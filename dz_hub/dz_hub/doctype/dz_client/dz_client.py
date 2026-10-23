@@ -48,12 +48,12 @@ class DZClient(Document):
 
 	def check_sector(self):
 		"""The choices must match what dz_core's prepare() knows (it is on this bench)."""
-		from dz_core.dz_core.doctype.dz_core_settings.dz_core_settings import IFU, REEL
+		from dz_core.dz_core.doctype.dz_core_settings.dz_core_settings import REGIMES
 		from dz_core.setup.sectors import SECTORS
 
 		if self.sector and self.sector not in SECTORS:
 			frappe.throw(_("Secteur inconnu de dz_core : {0}").format(self.sector))
-		if self.tax_regime and self.tax_regime not in (IFU, REEL):
+		if self.tax_regime and self.tax_regime not in REGIMES:
 			frappe.throw(_("Régime fiscal inconnu : {0}").format(self.tax_regime))
 
 	def on_update(self):
