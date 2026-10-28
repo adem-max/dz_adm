@@ -5,12 +5,12 @@ site is theirs, what they pay for (packs and options), their monthly
 invoices, and suspension when they don't pay.
 
 (Called "DZ COD Hub", app `dz_cod_hub`, until 19 October 2026, when it only
-knew online sellers. Repo: adem-max/dz_adm, private.)
+knew online sellers. Repo: adem-max/dz_adm, public like the other two.)
 
 Brand (22 October 2026): the company is **Sijil**, the ERP it sells is
 **Daftar** ("Daftar by Sijil"); see dafter-core DECISIONS.md. Nothing renamed yet.
 
-**Private.** Install it only on your hub site, never on a client site.
+**Vendor only.** Install it only on your hub site, never on a client site.
 
 ## How it fits
 
@@ -70,7 +70,7 @@ can be sold (`dz_core.features.bench_catalog`) and to set sites up.
 cd ~/frappe-bench
 bench get-app https://github.com/adem-max/dafter-core     # must be on the bench
 bench get-app https://github.com/adem-max/dafter-cod      # for online sellers
-bench get-app git@github.com:adem-max/dz_adm.git          # this repo (private: deploy key)
+bench get-app https://github.com/adem-max/dz_adm          # this repo
 bench new-site hub.yourdomain --install-app erpnext
 # setup wizard: your company, Algeria, DZD
 bench --site hub.yourdomain install-app dz_hub
