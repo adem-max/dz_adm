@@ -23,7 +23,9 @@ hub talks to dz_core first and to dz_cod only for what dz_cod adds:
   Vente en ligne pack since, then `dz-features --set <options>`. Dropping the
   pack never uninstalls dz_cod (that would delete its orders): its options
   are switched off and the log says so.
-- suspend / reactivate: maintenance mode on / off (an unpaid client)
+- suspend / reactivate: an unpaid client's site goes read-only (dz_core's
+  `dz_suspended`: log in, read, export, save nothing) and its scheduler
+  pauses; reactivate lifts both
 """
 
 import json
@@ -35,6 +37,7 @@ import sys
 import frappe
 from frappe import _
 from frappe.utils import get_bench_path, get_sites, now_datetime
+from frappe.utils.background_jobs import is_job_enqueued
 
 from dz_hub.setup import BASE, CORE_APP, ONLINE, ONLINE_APP
 
@@ -63,12 +66,23 @@ def check_site_name(site, must_exist=True):
 		frappe.throw(_("Le site {0} existe déjà.").format(site))
 
 
-def run_bench(site, args, timeout=300):
-	"""Run one bench command for `site`. Returns its output; raises BenchError."""
-	command = [sys.executable, "-m", "frappe.utils.bench_helper", "frappe", "--site", site, *args]
+def run_bench(site, args, timeout=300, secrets=None):
+	"""Run one bench command for `site`. Returns its output; raises BenchError.
+
+	`secrets` ({environment variable: value}) reach the command through its
+	environment, through dz_core.secret_bench, never through its arguments:
+	any local user can read a process's arguments with `ps` (review of 27
+	October 2026, 3.1)."""
+	if secrets:
+		command = [sys.executable, "-m", "dz_core.secret_bench", "--site", site, *args]
+		env = {**os.environ, **secrets}
+	else:
+		command = [sys.executable, "-m", "frappe.utils.bench_helper", "frappe", "--site", site, *args]
+		env = None
 	result = subprocess.run(
 		command,
 		cwd=f"{get_bench_path()}/sites",
+		env=env,
 		capture_output=True,
 		text=True,
 		timeout=timeout,
@@ -154,17 +168,9 @@ def new_site(client):
 	keep_admin_password(client, admin_password)
 	log = run_bench(
 		client.site_name,
-		[
-			"new-site",
-			client.site_name,
-			"--mariadb-root-password",
-			root_password,
-			"--admin-password",
-			admin_password,
-			"--install-app",
-			"erpnext",
-		],
+		["new-site", client.site_name, "--install-app", "erpnext"],
 		timeout=TIMEOUT["create_site"],
+		secrets={"DZ_DB_ROOT_PASSWORD": root_password, "DZ_ADMIN_PASSWORD": admin_password},
 	)
 	# From here every step can run again: a failed creation is resumed, not refused
 	log += run_bench(client.site_name, ["set-config", SITE_MARK, client.name])
@@ -222,14 +228,27 @@ def do_apply_features(client):
 	return log + output, applied
 
 
+# Suspended: the client logs in, reads and exports their books, saves nothing
+# (dz_core/suspension.py), and no scheduled job runs. Not maintenance mode: it
+# shuts the client out of their own books, which they must be able to consult
+# (review of 27 October 2026, 3.5; decision D2).
+SUSPEND = [["set-config", "dz_suspended", "1"], ["set-config", "pause_scheduler", "1"]]
+# Réactiver also lifts the maintenance mode of a site suspended before 0.4.1
+REACTIVATE = [
+	["set-config", "dz_suspended", "0"],
+	["set-config", "pause_scheduler", "0"],
+	["set-maintenance-mode", "off"],
+]
+
+
 def do_suspend(client):
 	check_site_name(client.site_name)
-	return run_bench(client.site_name, ["set-maintenance-mode", "on"]), None
+	return "".join(run_bench(client.site_name, args) for args in SUSPEND), None
 
 
 def do_reactivate(client):
 	check_site_name(client.site_name)
-	return run_bench(client.site_name, ["set-maintenance-mode", "off"]), None
+	return "".join(run_bench(client.site_name, args) for args in REACTIVATE), None
 
 
 ACTIONS = {
@@ -248,11 +267,19 @@ def start(client, action):
 	if action not in ACTIONS:
 		frappe.throw(_("Action inconnue : {0}").format(action))
 	frappe.get_doc("DZ Client", client).check_permission("write")
+	# One action at a time per client: two "Créer le site" running together
+	# would both run new-site and install-app on the same site (review of 27
+	# October 2026, 3.2)
+	job_id = f"dz_hub_{client}"
+	if is_job_enqueued(job_id):
+		frappe.throw(_("Une action est déjà en cours pour {0} : attendez qu'elle se termine.").format(client))
 	frappe.enqueue(
 		run_action,
 		queue="long",
 		timeout=TIMEOUT[action] + 60,
 		enqueue_after_commit=True,
+		job_id=job_id,
+		deduplicate=True,
 		client=client,
 		action=action,
 		user=frappe.session.user,

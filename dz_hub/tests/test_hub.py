@@ -154,6 +154,38 @@ class TestRemote(IntegrationTestCase):
 		self.assertEqual(command[-4:], ["--site", "client1.localhost", "dz-features", "--list"])
 		self.assertNotIn("shell", run.call_args.kwargs)
 
+	def test_one_action_at_a_time_per_client(self):
+		"""Review of 27 October 2026, 3.2: a second click while an action is
+		queued or running is refused, with a message."""
+		client = make_client([], site="client-twice.localhost")
+		with (
+			patch.object(remote, "is_job_enqueued", return_value=False),
+			patch.object(remote.frappe, "enqueue") as enqueue,
+		):
+			remote.start(client.name, "suspend")
+		self.assertEqual(enqueue.call_args.kwargs["job_id"], f"dz_hub_{client.name}")
+		self.assertTrue(enqueue.call_args.kwargs["deduplicate"])
+		with (
+			patch.object(remote, "is_job_enqueued", return_value=True),
+			patch.object(remote.frappe, "enqueue") as enqueue,
+			self.assertRaises(frappe.ValidationError),
+		):
+			remote.start(client.name, "suspend")
+		enqueue.assert_not_called()
+
+	def test_secrets_go_through_the_environment(self):
+		done = SimpleNamespace(returncode=0, stdout="ok", stderr="")
+		with patch.object(remote.subprocess, "run", return_value=done) as run:
+			remote.run_bench(
+				"client1.localhost",
+				["new-site", "client1.localhost"],
+				secrets={"DZ_DB_ROOT_PASSWORD": "s3cr3t"},
+			)
+		command, env = run.call_args.args[0], run.call_args.kwargs["env"]
+		self.assertEqual(command[1:3], ["-m", "dz_core.secret_bench"])
+		self.assertNotIn("s3cr3t", " ".join(command))
+		self.assertEqual(env["DZ_DB_ROOT_PASSWORD"], "s3cr3t")
+
 	def test_apply_features_records_what_the_site_answered(self):
 		client = make_client(["phone_checks", "labels_reports"], site="client-apply.localhost")
 		on = {"courier_api": False, "phone_checks": True, "n8n_webhooks": False, "labels_reports": True}
@@ -170,7 +202,9 @@ class TestRemote(IntegrationTestCase):
 		client.reload()
 		self.assertEqual(client.applied_features, "labels_reports, phone_checks")
 
-	def test_suspend_and_reactivate_set_maintenance_mode_and_status(self):
+	def test_suspend_makes_the_site_read_only_and_reactivate_lifts_it(self):
+		"""Review of 27 October 2026, 3.5: not maintenance mode, which kept the
+		client out of their own books."""
 		client = make_client([], site="client-suspend.localhost")
 		with (
 			patch("frappe.db.commit"),
@@ -178,10 +212,21 @@ class TestRemote(IntegrationTestCase):
 			patch.object(remote, "run_bench", return_value="") as run,
 		):
 			remote.run_action(client.name, "suspend")
-			self.assertEqual(run.call_args.args[1], ["set-maintenance-mode", "on"])
+			self.assertEqual(
+				[call.args[1] for call in run.call_args_list],
+				[["set-config", "dz_suspended", "1"], ["set-config", "pause_scheduler", "1"]],
+			)
 			self.assertEqual(frappe.db.get_value("DZ Client", client.name, "status"), "Suspendu")
+			run.reset_mock()
 			remote.run_action(client.name, "reactivate")
-			self.assertEqual(run.call_args.args[1], ["set-maintenance-mode", "off"])
+			self.assertEqual(
+				[call.args[1] for call in run.call_args_list],
+				[
+					["set-config", "dz_suspended", "0"],
+					["set-config", "pause_scheduler", "0"],
+					["set-maintenance-mode", "off"],
+				],
+			)
 		self.assertEqual(frappe.db.get_value("DZ Client", client.name, "status"), "Actif")
 
 	def test_a_failed_command_is_logged_and_changes_nothing(self):
@@ -210,6 +255,7 @@ class TestRemote(IntegrationTestCase):
 			patch.object(remote, "run_bench", return_value=answer) as run,
 		):
 			remote.run_action(client.name, "create_site")
+		self.bench_calls = run.call_args_list
 		return [call.args[1] for call in run.call_args_list]
 
 	def kwargs_of(self, args):
@@ -240,7 +286,14 @@ class TestRemote(IntegrationTestCase):
 		password = client.get_password("admin_password")
 		self.assertEqual(len(password), 16)
 		self.assertEqual(frappe.db.get_value("DZ Client", client.name, "admin_password"), "*" * 16)
-		self.assertIn(password, calls[0])
+		# both passwords go through the environment, never the arguments (review of 27 Oct, 3.1)
+		self.assertNotIn(password, calls[0])
+		self.assertNotIn("secret", calls[0])
+		self.assertEqual(
+			self.bench_calls[0].kwargs["secrets"],
+			{"DZ_DB_ROOT_PASSWORD": "secret", "DZ_ADMIN_PASSWORD": password},
+		)
+		self.assertNotIn(password, client.apply_log or "")
 
 	def test_prepare_arguments_are_python_not_json(self):
 		# A client without a courier, a company name with quotes and accents

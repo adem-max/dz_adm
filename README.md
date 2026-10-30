@@ -5,12 +5,12 @@ site is theirs, what they pay for (packs and options), their monthly
 invoices, and suspension when they don't pay.
 
 (Called "DZ COD Hub", app `dz_cod_hub`, until 19 October 2026, when it only
-knew online sellers. Repo: adem-max/dz_adm, private.)
+knew online sellers. Repo: adem-max/dz_adm, public like the other two.)
 
 Brand (22 October 2026): the company is **Sijil**, the ERP it sells is
 **Daftar** ("Daftar by Sijil"); see dafter-core DECISIONS.md. Nothing renamed yet.
 
-**Private.** Install it only on your hub site, never on a client site.
+**Vendor only.** Install it only on your hub site, never on a client site.
 
 ## How it fits
 
@@ -60,8 +60,16 @@ can be sold (`dz_core.features.bench_catalog`) and to set sites up.
     dz_cod and runs its setup. Untaking it never uninstalls dz_cod (that
     would delete their orders): its options are switched off. An orange
     banner shows when the site does not have the options the client pays for.
-  - *Suspendre* / *Réactiver*: maintenance mode on / off. A running site picks
-    the change up within about a minute.
+  - *Suspendre* / *Réactiver*: the site goes read-only (dz_core's
+    `dz_suspended`: the client logs in, reads and exports their books, saves
+    nothing) and its scheduler pauses; *Réactiver* lifts both. Not maintenance
+    mode, since 29 October 2026: it shut the client out of books they must be
+    able to consult, even Frappe's read-only variant (a login writes its
+    session). A running site picks the change up within about a minute.
+    Courier webhooks fail while suspended; Yalidine retries for 40 hours,
+    after which its webhook must be re-enabled on Yalidine's dashboard.
+  - One action at a time per client: a second click while one is queued or
+    running is refused.
   - *Mettre à jour l'abonnement*: rebuild the Subscription from the offer.
 
 ## Install (on the server that runs the client sites)
@@ -70,7 +78,7 @@ can be sold (`dz_core.features.bench_catalog`) and to set sites up.
 cd ~/frappe-bench
 bench get-app https://github.com/adem-max/dafter-core     # must be on the bench
 bench get-app https://github.com/adem-max/dafter-cod      # for online sellers
-bench get-app git@github.com:adem-max/dz_adm.git          # this repo (private: deploy key)
+bench get-app https://github.com/adem-max/dz_adm          # this repo
 bench new-site hub.yourdomain --install-app erpnext
 # setup wizard: your company, Algeria, DZD
 bench --site hub.yourdomain install-app dz_hub
@@ -109,6 +117,25 @@ bench --site hub.localhost migrate          # new fields, the two patches, the p
 (The `Module Def` "DZ COD Hub" is deleted and "DZ Hub" given `app_name = dz_hub`
 the same way if `install-app` was tried first.)
 
+## What the hub can do, and how to keep it safe
+
+The hub runs `bench` for every client site on its server, with the MariaDB
+root password: **whoever controls the hub controls every client's
+database.** So:
+
+- Keep its System Managers to the bare minimum (you). Only System Managers
+  can press the buttons on a client.
+- Turn on two-factor login on the hub (System Settings → Login → Enable Two
+  Factor Auth).
+- Keep the hub's own `encryption_key` (its `site_config.json`) in the
+  off-site backup: without it the stored passwords (MariaDB root, each
+  client's Administrator) cannot be read after a restore.
+- Passwords never go on a command line: *Créer le site* hands them to bench
+  through the environment (dz_core's `secret_bench`), since any local user
+  can read a process's arguments. Mount `/proc` with `hidepid=2` as well
+  (dafter-core docs/DEPLOY.md, security checklist).
+- Never install dz_hub on a client site.
+
 ## Daily use
 
 1. New client: Customer → DZ Client (site, *Vente en ligne* or not, options,
@@ -125,8 +152,12 @@ On a separate hub test site, never your real hub (tests write and roll back data
 
 ```bash
 bench --site hub-test.localhost set-config allow_tests 1
-bench --site hub-test.localhost run-tests --app dz_hub     # 22 tests
+bench --site hub-test.localhost run-tests --app dz_hub
 ```
+
+[![CI](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml/badge.svg)](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml)
+(every push, and weekly). History of the three apps: `CHANGELOG.md` in the
+Daftar workspace.
 
 The `bench` calls are mocked in the tests: no site is created or changed.
 
