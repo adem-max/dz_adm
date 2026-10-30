@@ -63,12 +63,23 @@ def check_site_name(site, must_exist=True):
 		frappe.throw(_("Le site {0} existe déjà.").format(site))
 
 
-def run_bench(site, args, timeout=300):
-	"""Run one bench command for `site`. Returns its output; raises BenchError."""
-	command = [sys.executable, "-m", "frappe.utils.bench_helper", "frappe", "--site", site, *args]
+def run_bench(site, args, timeout=300, secrets=None):
+	"""Run one bench command for `site`. Returns its output; raises BenchError.
+
+	`secrets` ({environment variable: value}) reach the command through its
+	environment, through dz_core.secret_bench, never through its arguments:
+	any local user can read a process's arguments with `ps` (review of 27
+	October 2026, 3.1)."""
+	if secrets:
+		command = [sys.executable, "-m", "dz_core.secret_bench", "--site", site, *args]
+		env = {**os.environ, **secrets}
+	else:
+		command = [sys.executable, "-m", "frappe.utils.bench_helper", "frappe", "--site", site, *args]
+		env = None
 	result = subprocess.run(
 		command,
 		cwd=f"{get_bench_path()}/sites",
+		env=env,
 		capture_output=True,
 		text=True,
 		timeout=timeout,
@@ -154,17 +165,9 @@ def new_site(client):
 	keep_admin_password(client, admin_password)
 	log = run_bench(
 		client.site_name,
-		[
-			"new-site",
-			client.site_name,
-			"--mariadb-root-password",
-			root_password,
-			"--admin-password",
-			admin_password,
-			"--install-app",
-			"erpnext",
-		],
+		["new-site", client.site_name, "--install-app", "erpnext"],
 		timeout=TIMEOUT["create_site"],
+		secrets={"DZ_DB_ROOT_PASSWORD": root_password, "DZ_ADMIN_PASSWORD": admin_password},
 	)
 	# From here every step can run again: a failed creation is resumed, not refused
 	log += run_bench(client.site_name, ["set-config", SITE_MARK, client.name])

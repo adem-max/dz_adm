@@ -154,6 +154,19 @@ class TestRemote(IntegrationTestCase):
 		self.assertEqual(command[-4:], ["--site", "client1.localhost", "dz-features", "--list"])
 		self.assertNotIn("shell", run.call_args.kwargs)
 
+	def test_secrets_go_through_the_environment(self):
+		done = SimpleNamespace(returncode=0, stdout="ok", stderr="")
+		with patch.object(remote.subprocess, "run", return_value=done) as run:
+			remote.run_bench(
+				"client1.localhost",
+				["new-site", "client1.localhost"],
+				secrets={"DZ_DB_ROOT_PASSWORD": "s3cr3t"},
+			)
+		command, env = run.call_args.args[0], run.call_args.kwargs["env"]
+		self.assertEqual(command[1:3], ["-m", "dz_core.secret_bench"])
+		self.assertNotIn("s3cr3t", " ".join(command))
+		self.assertEqual(env["DZ_DB_ROOT_PASSWORD"], "s3cr3t")
+
 	def test_apply_features_records_what_the_site_answered(self):
 		client = make_client(["phone_checks", "labels_reports"], site="client-apply.localhost")
 		on = {"courier_api": False, "phone_checks": True, "n8n_webhooks": False, "labels_reports": True}
@@ -210,6 +223,7 @@ class TestRemote(IntegrationTestCase):
 			patch.object(remote, "run_bench", return_value=answer) as run,
 		):
 			remote.run_action(client.name, "create_site")
+		self.bench_calls = run.call_args_list
 		return [call.args[1] for call in run.call_args_list]
 
 	def kwargs_of(self, args):
@@ -240,7 +254,14 @@ class TestRemote(IntegrationTestCase):
 		password = client.get_password("admin_password")
 		self.assertEqual(len(password), 16)
 		self.assertEqual(frappe.db.get_value("DZ Client", client.name, "admin_password"), "*" * 16)
-		self.assertIn(password, calls[0])
+		# both passwords go through the environment, never the arguments (review of 27 Oct, 3.1)
+		self.assertNotIn(password, calls[0])
+		self.assertNotIn("secret", calls[0])
+		self.assertEqual(
+			self.bench_calls[0].kwargs["secrets"],
+			{"DZ_DB_ROOT_PASSWORD": "secret", "DZ_ADMIN_PASSWORD": password},
+		)
+		self.assertNotIn(password, client.apply_log or "")
 
 	def test_prepare_arguments_are_python_not_json(self):
 		# A client without a courier, a company name with quotes and accents
