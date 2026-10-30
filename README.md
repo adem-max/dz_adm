@@ -152,8 +152,12 @@ On a separate hub test site, never your real hub (tests write and roll back data
 
 ```bash
 bench --site hub-test.localhost set-config allow_tests 1
-bench --site hub-test.localhost run-tests --app dz_hub     # 22 tests
+bench --site hub-test.localhost run-tests --app dz_hub
 ```
+
+[![CI](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml/badge.svg)](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml)
+(every push, and weekly). History of the three apps: `CHANGELOG.md` in the
+Daftar workspace.
 
 The `bench` calls are mocked in the tests: no site is created or changed.
 
