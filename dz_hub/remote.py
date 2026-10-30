@@ -23,7 +23,9 @@ hub talks to dz_core first and to dz_cod only for what dz_cod adds:
   Vente en ligne pack since, then `dz-features --set <options>`. Dropping the
   pack never uninstalls dz_cod (that would delete its orders): its options
   are switched off and the log says so.
-- suspend / reactivate: maintenance mode on / off (an unpaid client)
+- suspend / reactivate: an unpaid client's site goes read-only (dz_core's
+  `dz_suspended`: log in, read, export, save nothing) and its scheduler
+  pauses; reactivate lifts both
 """
 
 import json
@@ -35,6 +37,7 @@ import sys
 import frappe
 from frappe import _
 from frappe.utils import get_bench_path, get_sites, now_datetime
+from frappe.utils.background_jobs import is_job_enqueued
 
 from dz_hub.setup import BASE, CORE_APP, ONLINE, ONLINE_APP
 
@@ -225,14 +228,27 @@ def do_apply_features(client):
 	return log + output, applied
 
 
+# Suspended: the client logs in, reads and exports their books, saves nothing
+# (dz_core/suspension.py), and no scheduled job runs. Not maintenance mode: it
+# shuts the client out of their own books, which they must be able to consult
+# (review of 27 October 2026, 3.5; decision D2).
+SUSPEND = [["set-config", "dz_suspended", "1"], ["set-config", "pause_scheduler", "1"]]
+# Réactiver also lifts the maintenance mode of a site suspended before 0.4.1
+REACTIVATE = [
+	["set-config", "dz_suspended", "0"],
+	["set-config", "pause_scheduler", "0"],
+	["set-maintenance-mode", "off"],
+]
+
+
 def do_suspend(client):
 	check_site_name(client.site_name)
-	return run_bench(client.site_name, ["set-maintenance-mode", "on"]), None
+	return "".join(run_bench(client.site_name, args) for args in SUSPEND), None
 
 
 def do_reactivate(client):
 	check_site_name(client.site_name)
-	return run_bench(client.site_name, ["set-maintenance-mode", "off"]), None
+	return "".join(run_bench(client.site_name, args) for args in REACTIVATE), None
 
 
 ACTIONS = {
@@ -251,11 +267,19 @@ def start(client, action):
 	if action not in ACTIONS:
 		frappe.throw(_("Action inconnue : {0}").format(action))
 	frappe.get_doc("DZ Client", client).check_permission("write")
+	# One action at a time per client: two "Créer le site" running together
+	# would both run new-site and install-app on the same site (review of 27
+	# October 2026, 3.2)
+	job_id = f"dz_hub_{client}"
+	if is_job_enqueued(job_id):
+		frappe.throw(_("Une action est déjà en cours pour {0} : attendez qu'elle se termine.").format(client))
 	frappe.enqueue(
 		run_action,
 		queue="long",
 		timeout=TIMEOUT[action] + 60,
 		enqueue_after_commit=True,
+		job_id=job_id,
+		deduplicate=True,
 		client=client,
 		action=action,
 		user=frappe.session.user,

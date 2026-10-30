@@ -60,8 +60,16 @@ can be sold (`dz_core.features.bench_catalog`) and to set sites up.
     dz_cod and runs its setup. Untaking it never uninstalls dz_cod (that
     would delete their orders): its options are switched off. An orange
     banner shows when the site does not have the options the client pays for.
-  - *Suspendre* / *Réactiver*: maintenance mode on / off. A running site picks
-    the change up within about a minute.
+  - *Suspendre* / *Réactiver*: the site goes read-only (dz_core's
+    `dz_suspended`: the client logs in, reads and exports their books, saves
+    nothing) and its scheduler pauses; *Réactiver* lifts both. Not maintenance
+    mode, since 29 October 2026: it shut the client out of books they must be
+    able to consult, even Frappe's read-only variant (a login writes its
+    session). A running site picks the change up within about a minute.
+    Courier webhooks fail while suspended; Yalidine retries for 40 hours,
+    after which its webhook must be re-enabled on Yalidine's dashboard.
+  - One action at a time per client: a second click while one is queued or
+    running is refused.
   - *Mettre à jour l'abonnement*: rebuild the Subscription from the offer.
 
 ## Install (on the server that runs the client sites)
@@ -108,6 +116,25 @@ bench --site hub.localhost migrate          # new fields, the two patches, the p
 
 (The `Module Def` "DZ COD Hub" is deleted and "DZ Hub" given `app_name = dz_hub`
 the same way if `install-app` was tried first.)
+
+## What the hub can do, and how to keep it safe
+
+The hub runs `bench` for every client site on its server, with the MariaDB
+root password: **whoever controls the hub controls every client's
+database.** So:
+
+- Keep its System Managers to the bare minimum (you). Only System Managers
+  can press the buttons on a client.
+- Turn on two-factor login on the hub (System Settings → Login → Enable Two
+  Factor Auth).
+- Keep the hub's own `encryption_key` (its `site_config.json`) in the
+  off-site backup: without it the stored passwords (MariaDB root, each
+  client's Administrator) cannot be read after a restore.
+- Passwords never go on a command line: *Créer le site* hands them to bench
+  through the environment (dz_core's `secret_bench`), since any local user
+  can read a process's arguments. Mount `/proc` with `hidepid=2` as well
+  (dafter-core docs/DEPLOY.md, security checklist).
+- Never install dz_hub on a client site.
 
 ## Daily use
 
