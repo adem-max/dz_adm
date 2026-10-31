@@ -156,8 +156,8 @@ bench --site hub-test.localhost run-tests --app dz_hub
 ```
 
 [![CI](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml/badge.svg)](https://github.com/adem-max/dz_adm/actions/workflows/ci.yml)
-(every push, and weekly). History of the three apps: `CHANGELOG.md` in the
-Daftar workspace.
+(every push, and weekly). History of the three apps:
+[dafter-core's CHANGELOG.md](https://github.com/adem-max/dafter-core/blob/main/CHANGELOG.md).
 
 The `bench` calls are mocked in the tests: no site is created or changed.
 

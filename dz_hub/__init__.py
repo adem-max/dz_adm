@@ -1,4 +1,4 @@
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 # The oldest dz_core this hub works with: it reads dz_core's feature catalogue,
 # sectors and tax regimes, and runs its setup on client sites. Raise it in the
